@@ -1,5 +1,11 @@
+// ignore_for_file: unused_import
+
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:path_provider/path_provider.dart';
 import '../controllers/stok_controller.dart';
 import '../controllers/barang_controller.dart';
 
@@ -15,6 +21,14 @@ class StokView extends StatelessWidget {
       appBar: AppBar(
         title: const Text('Stok'),
         centerTitle: true,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.print),
+            onPressed: () {
+              _generatePDF();
+            },
+          ),
+        ],
       ),
       body: Obx(() {
         if (stokController.isLoading.value || barangController.isLoading.value) {
@@ -29,14 +43,12 @@ class StokView extends StatelessWidget {
           itemBuilder: (context, index) {
             var stok = stokController.stokList[index];
             var barang = barangController.barangList.firstWhereOrNull((b) => b.id == stok.idBarang);
+            
             return Card(
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
               elevation: 3,
               margin: const EdgeInsets.symmetric(vertical: 8),
               child: ListTile(
-                leading: CircleAvatar(
-                  child: Text(stok.id.toString()),
-                ),
                 title: Text('Nama Barang: ${barang?.namaBarang ?? "Tidak Ditemukan"}'),
                 subtitle: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -46,50 +58,17 @@ class StokView extends StatelessWidget {
                     Text('Keterangan: ${stok.keterangan}'),
                   ],
                 ),
-                trailing: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.edit, color: Colors.blue),
-                      onPressed: () {
-                        _editStok(stok);
-                      },
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.delete, color: Colors.red),
-                      onPressed: () {
-                        _confirmDelete(stok.id);
-                      },
-                    ),
-                  ],
+                trailing: IconButton(
+                  icon: const Icon(Icons.delete, color: Colors.red),
+                  onPressed: () {
+                    _confirmDelete(stok.id);
+                  },
                 ),
               ),
             );
           },
         );
       }),
-    );
-  }
-
-  void _editStok(stok) {
-    Get.defaultDialog(
-      title: "Edit Stok",
-      content: Column(
-        children: [
-          TextField(
-            controller: TextEditingController(text: stok.jumlah.toString()),
-            keyboardType: TextInputType.number,
-            onChanged: (value) => stok.jumlah = int.tryParse(value) ?? stok.jumlah,
-            decoration: const InputDecoration(labelText: "Jumlah Stok"),
-          ),
-        ],
-      ),
-      textConfirm: "Simpan",
-      textCancel: "Batal",
-      onConfirm: () {
-        stokController.updateStok(stok);
-        Get.back();
-      },
     );
   }
 
@@ -105,5 +84,42 @@ class StokView extends StatelessWidget {
         Get.back();
       },
     );
+  }
+
+  Future<void> _generatePDF() async {
+    final pdf = pw.Document();
+
+    pdf.addPage(
+      pw.Page(
+        build: (pw.Context context) {
+          return pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.Text("Laporan Stok", style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold)),
+              pw.SizedBox(height: 10),
+              pw.Table.fromTextArray(
+                headers: ["Nama Barang", "Jumlah", "Tanggal", "Keterangan"],
+                data: stokController.stokList.map((stok) {
+                  var barang = barangController.barangList.firstWhereOrNull((b) => b.id == stok.idBarang);
+                  return [
+                    barang?.namaBarang ?? "Tidak Ditemukan",
+                    stok.jumlah.toString(),
+                    stok.tanggal,
+                    stok.keterangan
+                  ];
+                }).toList(),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+
+    final output = await getExternalStorageDirectory();
+    final file = File("${output!.path}/laporan_stok.pdf");
+
+    await file.writeAsBytes(await pdf.save());
+
+    Get.snackbar("Sukses", "PDF berhasil dibuat di ${file.path}");
   }
 }

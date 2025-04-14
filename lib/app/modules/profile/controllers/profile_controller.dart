@@ -1,26 +1,42 @@
-// ignore_for_file: unused_import
-
 import 'package:get/get.dart';
-import 'package:flutter/material.dart';
-import 'package:inventera/app/routes/app_pages.dart'; // Sesuaikan dengan struktur project
+import 'package:http/http.dart' as http;
+import 'package:inventera/app/data/profile_response.dart';
+import 'dart:convert';
+
+
 
 class ProfileController extends GetxController {
-  var userName = "Admin Inventera".obs;
-  var email = "admin@inventera.com".obs;
-  var profileImage = "https://i.pravatar.cc/150?img=3".obs; // Placeholder foto profil
+  var isLoading = true.obs;
+  var profile = ProfileResponse().obs;
 
-  void logout() {
-    Get.offAllNamed(Routes.LOGIN); // Arahkan ke halaman login setelah logout
+  @override
+  void onInit() {
+    super.onInit();
+    fetchProfile();
   }
 
-  // Simulasi perubahan nama (misalnya dari API atau input user)
-  void updateProfile(String newName, String newEmail) {
-    userName.value = newName;
-    email.value = newEmail;
-  }
+  void fetchProfile() async {
+    try {
+      isLoading(true);
+      var response = await http.get(
+        Uri.parse(
+            "http://192.168.0.48:8000/api/profile"), // ganti sesuai endpoint Laravel kamu
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': 'Bearer 93|2mJot9SYc1rBsUyYbVu6Gvo1tNWkWp8UPuBNho5E', // Kalau pakai token
+        },
+      );
 
-  // Simulasi update foto profil
-  void updateProfileImage(String newImageUrl) {
-    profileImage.value = newImageUrl;
+      if (response.statusCode == 200) {
+        final jsonResult = json.decode(response.body);
+        profile.value = ProfileResponse.fromJson(jsonResult);
+      } else {
+        Get.snackbar("Error", "Gagal memuat profil (${response.statusCode})");
+      }
+    } catch (e) {
+      Get.snackbar("Error", e.toString());
+    } finally {
+      isLoading(false);
+    }
   }
 }
